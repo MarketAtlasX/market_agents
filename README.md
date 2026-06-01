@@ -1,95 +1,115 @@
 # market_agents
 
-This folder contains three lightweight agents implemented in pure Python:
+MarketAtlas `market_agents` is a lightweight Python prototype for combining market signals with geopolitical impact analysis and simple trade recommendations.
 
-- Impact Analysis Agent: extracts simple relations from text and computes a composite risk index.
-- Market Data Agent: computes momentum, 14-day rolling volatility, and volume status.
-- Recommendation Agent: combines the two to emit BUY/HOLD/SELL signals using heuristics.
+It currently includes three small agents:
 
-# Quick demo
+- Impact Analysis Agent: extracts basic relations from text, builds a graph, and computes a composite risk score.
+- Market Data Agent: calculates momentum, rolling volatility, and volume status from a price series.
+- Recommendation Agent: combines the market snapshot and impact score to produce a BUY, HOLD, or SELL decision.
 
-Run the demo (from the repository root):
+## What works today
+
+- A runnable demo entrypoint in `main.py`.
+- Best-effort live ingest helpers for Alpha Vantage, FRED, EIA, GDELT, and ACLED.
+- Fallback synthetic data when APIs or network calls are unavailable.
+- A broader pytest suite covering the demo path, market-data logic, impact flow, recommendation rules, and ingest helper behavior.
+
+## Repository Layout
+
+```text
+market_agents/
+  main.py
+  graph/
+  impact/
+  ingest/
+  market_data/
+  recommendation/
+  tests/
+  requirements.txt
+  README.md
+```
+
+## Setup
+
+Create and activate a virtual environment, then install dependencies:
 
 ```bash
-python -m market_agents.main
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-Or run inside the package folder:
+## Configuration
 
-```bash
-cd market_agents
-python main.py
-```
+Create a `.env` file in the repository root if you want live API-backed fetches:
 
-One-shot fetch-and-cache (Alpha Vantage, FRED, EIA)
------------------------------------------------
-
-1. Create `market_agents/.env` with your API keys (optional — fallbacks exist):
-
-```
+```env
 ALPHAVANTAGE_API_KEY=your_key_here
 FRED_API_KEY=your_key_here
 EIA_API_KEY=your_key_here
 ```
 
-2. Run the cache fetch (writes JSON files to `market_agents/ingest/cache/`):
+If these keys are missing, the project still runs using deterministic fallback data.
+
+## Run The Demo
+
+From the repository root:
+
+```bash
+python main.py
+```
+
+If you want to run it as a module from a parent directory:
+
+```bash
+python -m market_agents.main
+```
+
+The demo prints:
+
+- A market snapshot with momentum, volatility, and volume state.
+- An impact summary with local and composite risk.
+- A recommendation with the final action and reason.
+
+## Fetch And Cache Data
+
+Run the one-shot cache job to fetch live data where possible and write JSON files into `ingest/cache/`:
 
 ```bash
 python -m market_agents.ingest.cache
 ```
 
-If you do not provide keys, the cache step writes deterministic fallback JSON so the agents remain runnable.
+This step is resilient:
 
-Tests
------
+- With keys and network access, it stores live responses.
+- Without keys or when requests fail, it stores deterministic fallback payloads.
 
-Run the unit test suite from inside `market_agents`:
+## Run Tests
+
+Run the full test suite with:
 
 ```bash
 python -m pytest -q tests
 ```
 
-Dependencies
-------------
+Current test coverage includes:
 
-Install runtime dependencies (recommended inside a venv):
+- Demo smoke test.
+- Market-data signal calculations.
+- Market-data ingest wrapper behavior.
+- Impact pipeline and graph propagation.
+- Recommendation decision rules.
+- Alpha Vantage, FRED, and EIA helper parsing and fallback behavior.
 
-```bash
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1   # PowerShell
-pip install -r requirements.txt
-```
+## Current Status
 
-Notes
------
-- The current ingest helpers will attempt live fetches when API keys are provided in `.env`. If keys are missing or network calls fail, the helpers return fallback synthetic data so the demo and tests always run deterministically.
-- Next steps: integrate an LLM extractor for impact parsing, persist graphs to Neo4j, or expose agents via FastAPI. I can implement any of these on request.
+- The repo is passing tests with the current implementation.
+- Live API keys are wired through `.env` and used by the ingest helpers.
+- The codebase still keeps the graph workflow minimal, so the current focus is on the agent pipeline, ingestion, and validation.
 
-# MarketAtlas - market_agents restructure
+## Notes
 
-New layout:
-
-```
-agents/
-  impact/
-    impact_agent.py
-  market_data/
-    market_data_agent.py
-  recommendation/
-    recommendation_agent.py
-
-graph/
-  workflow/
-
-tests/
-
-main.py
-.env
-.venv (created previously)
-```
-
-Run demo:
-
-```bash
-.venv\Scripts\python.exe main.py
-```
+- `tests/conftest.py` keeps imports stable whether pytest is run from the repository root or the package directory.
+- The ingest helpers are intentionally best-effort, so the project remains runnable even when external APIs are unavailable.
+- If you want, the next natural step is to turn the placeholder graph workflow into a real LangGraph pipeline.
