@@ -1,6 +1,30 @@
 import networkx as nx
 from typing import Dict, Any
 from ..ingest.impact_api import fetch_gdelt_events, fetch_acled_events, fetch_eia_data
+from typing import List, Tuple
+
+
+def _persist_graph(nodes: Dict[str, Dict[str, Any]], relations: List[Tuple[str, str, str]]):
+    """Best-effort persistence helper. Keeps persistence logic testable.
+
+    Returns True if a write was attempted and succeeded, False otherwise.
+    """
+    try:
+        # prefer absolute package import (works in most test/run contexts)
+        try:
+            from market_agents.persistence import neo4j_client
+        except Exception:
+            from ..persistence import neo4j_client
+        import os
+
+        if os.environ.get("NEO4J_URI"):
+            try:
+                return neo4j_client.write_graph(nodes, relations)
+            except Exception:
+                return False
+    except Exception:
+        return False
+    return False
 
 
 class ImpactAgent:
@@ -83,4 +107,17 @@ class ImpactAgent:
 
     def output(self, state: Dict[str, Any]):
         state["graph_summary"] = {n: dict(self.g.nodes[n]) for n in self.g.nodes}
+        # also capture relations for persistence / inspection
+        relations = []
+        for a, b in self.g.edges:
+            rel = self.g.edges[a, b].get("relation")
+            relations.append((a, rel or "related", b))
+        state["relations"] = relations
+
+        # attempt optional persistence if Neo4j configured (best-effort)
+        try:
+            _persist_graph(state["graph_summary"], relations)
+        except Exception:
+            pass
+
         return state

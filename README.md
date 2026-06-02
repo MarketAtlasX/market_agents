@@ -1,21 +1,21 @@
 # market_agents
 
-MarketAtlas `market_agents` is a lightweight Python prototype for combining market signals with geopolitical impact analysis and simple trade recommendations.
+MarketAtlas `market_agents` is a lightweight Python prototype that combines market signals with simple geopolitical impact analysis and basic trade recommendations. It's designed to be fast to iterate on and resilient when external services (APIs, Neo4j) are unavailable.
 
-It currently includes three small agents:
+Core agents
 
-- Impact Analysis Agent: extracts basic relations from text, builds a graph, and computes a composite risk score.
-- Market Data Agent: calculates momentum, rolling volatility, and volume status from a price series.
-- Recommendation Agent: combines the market snapshot and impact score to produce a BUY, HOLD, or SELL decision.
+- Impact Analysis Agent: extracts simple entity relations from text, builds an in-memory graph, and computes local/composite risk scores.
+- Market Data Agent: computes momentum, rolling volatility, and volume status from a price series.
+- Recommendation Agent: synthesizes market snapshot + impact score to produce BUY / HOLD / SELL guidance.
 
-## What works today
+What works today
 
-- A runnable demo entrypoint in `main.py`.
-- Best-effort live ingest helpers for Alpha Vantage, FRED, EIA, GDELT, and ACLED.
-- Fallback synthetic data when APIs or network calls are unavailable.
-- A broader pytest suite covering the demo path, market-data logic, impact flow, recommendation rules, and ingest helper behavior.
+- Runnable demo entrypoint: `main.py`.
+- Best-effort ingest helpers for Alpha Vantage, FRED, EIA, GDELT, and ACLED with deterministic fallbacks.
+- A focused pytest suite covering demo flows, market-data signals, impact processing, recommendation logic, and ingest helper behavior.
+- Optional Neo4j persistence for Impact graphs (best-effort — does not break runtime if Neo4j is unreachable).
 
-## Repository Layout
+Repository layout
 
 ```text
 market_agents/
@@ -24,92 +24,95 @@ market_agents/
   impact/
   ingest/
   market_data/
+  persistence/
   recommendation/
   tests/
   requirements.txt
   README.md
+  docker-compose.neo4j.yml
 ```
 
-## Setup
+Setup
 
-Create and activate a virtual environment, then install dependencies:
+1. Create and activate a virtual environment and install dependencies:
 
-```bash
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## Configuration
-
-Create a `.env` file in the repository root if you want live API-backed fetches:
+2. (Optional) Create a `.env` file in the repository root for live API keys and optional Neo4j connection information:
 
 ```env
 ALPHAVANTAGE_API_KEY=your_key_here
 FRED_API_KEY=your_key_here
 EIA_API_KEY=your_key_here
+# Optional Neo4j connection (when running the local Neo4j container)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=test
 ```
 
-If these keys are missing, the project still runs using deterministic fallback data.
-
-## Run The Demo
+Running the demo
 
 From the repository root:
 
-```bash
+```powershell
 python main.py
 ```
 
-If you want to run it as a module from a parent directory:
+Run tests
 
-```bash
-python -m market_agents.main
-```
-
-The demo prints:
-
-- A market snapshot with momentum, volatility, and volume state.
-- An impact summary with local and composite risk.
-- A recommendation with the final action and reason.
-
-## Fetch And Cache Data
-
-Run the one-shot cache job to fetch live data where possible and write JSON files into `ingest/cache/`:
-
-```bash
-python -m market_agents.ingest.cache
-```
-
-This step is resilient:
-
-- With keys and network access, it stores live responses.
-- Without keys or when requests fail, it stores deterministic fallback payloads.
-
-## Run Tests
-
-Run the full test suite with:
-
-```bash
+```powershell
 python -m pytest -q tests
 ```
 
-Current test coverage includes:
+Neo4j (local development)
 
-- Demo smoke test.
-- Market-data signal calculations.
-- Market-data ingest wrapper behavior.
-- Impact pipeline and graph propagation.
-- Recommendation decision rules.
-- Alpha Vantage, FRED, and EIA helper parsing and fallback behavior.
+This repo includes `docker-compose.neo4j.yml` to run a local Neo4j instance for development and optional persistence. The service uses `NEO4J_AUTH=neo4j/test` by default.
 
-## Current Status
+Start Neo4j (background):
 
-- The repo is passing tests with the current implementation.
-- Live API keys are wired through `.env` and used by the ingest helpers.
-- The codebase still keeps the graph workflow minimal, so the current focus is on the agent pipeline, ingestion, and validation.
+```powershell
+docker compose -f docker-compose.neo4j.yml up -d
+```
 
-## Notes
+Check status:
 
-- `tests/conftest.py` keeps imports stable whether pytest is run from the repository root or the package directory.
-- The ingest helpers are intentionally best-effort, so the project remains runnable even when external APIs are unavailable.
-- If you want, the next natural step is to turn the placeholder graph workflow into a real LangGraph pipeline.
+```powershell
+docker compose -f docker-compose.neo4j.yml ps
+```
+
+The browser is available at http://localhost:7474 (use `neo4j` / `test` by default). If you start Neo4j locally, set `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` in your environment or `.env` file so the `ImpactAgent` can attempt best-effort writes.
+
+Git and pushing changes
+
+To stage, commit and push the changes made in this workspace:
+
+```powershell
+cd <repo-root>
+git add .
+git commit -m "Update README, add Neo4j persistence and tests"
+git push origin main
+```
+
+Status & notes
+
+- All tests in `tests/` currently pass locally (11 passed at the last run).
+- Neo4j persistence is optional: `ImpactAgent` attempts a best-effort write when `NEO4J_URI` is set; failures are ignored so the pipeline remains resilient.
+- The `persistence/neo4j_client.py` contains a simple MERGE-based writer — consider hardening Cypher parameterization for production.
+
+Next steps
+
+- Add CI (GitHub Actions) to run tests on push/PR and a separate job to exercise Neo4j integration using Docker-in-Docker or GitHub services.
+- Expand the LangGraph workflow and integrate an LLM-based impact extractor.
+
+Files of interest
+
+- README: [README.md](README.md)
+- Local Neo4j compose: [docker-compose.neo4j.yml](docker-compose.neo4j.yml)
+- Neo4j client: [persistence/neo4j_client.py](persistence/neo4j_client.py)
+- Impact agent: [impact/impact_agent.py](impact/impact_agent.py)
+
+If you'd like, I can commit and push these changes now and then start the local Neo4j container for you.

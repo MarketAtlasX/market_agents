@@ -7,4 +7,4 @@ python-dotenv
 langchain
 langgraph
 networkx
-numpy
+neo4j
