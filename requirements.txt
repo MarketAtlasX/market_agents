@@ -8,3 +8,6 @@ langchain
 langgraph
 networkx
 neo4j
+fastapi
+uvicorn[standard]
+pika
