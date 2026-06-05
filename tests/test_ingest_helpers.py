@@ -1,5 +1,3 @@
-import os
-
 from market_agents.ingest import impact_api, market_api
 
 
